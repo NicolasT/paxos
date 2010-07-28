@@ -1,6 +1,6 @@
-Name: paxoslease
+Name: paxos
 Version: 0.0.1
-Synopsis: An implementation of PaxosLease
+Synopsis: Implementations of Paxos and similar algorithms
 License: LGPL
 License-file: LICENSE
 Copyright: Copyright (c) 2010 Nicolas Trangez
@@ -8,8 +8,7 @@ Author: Nicolas Trangez
 Maintainer: Nicolas Trangez <eikke@eikke.com>
 
 Build-Type: Simple
-Cabal-Version: >= 1.2
-
+Cabal-Version: >= 1.8
 
 Library
     Exposed-Modules:
@@ -17,17 +16,21 @@ Library
     Build-Depends:
       base > 4 && < 5,
       binary,
+      hslogger,
+      hslogger-template,
       mtl,
       network
 
     Hs-Source-Dirs: src
-    GHC-Options: -Wall -Werror -O2 -funbox-strict-fields
+    GHC-Options: -Wall -O2 -funbox-strict-fields
 
-Executable demo
-    Main-is: Demo.hs
+Executable lease
+    Main-is: Lease.hs
     Build-Depends:
+      base,
+      paxos,
       hslogger,
       hslogger-template
 
-    Hs-Source-Dirs: src
-    GHC-Options: -Wall -Werror -O2 -funbox-strict-fields
+    Hs-Source-Dirs: demo
+    GHC-Options: -Wall -O2 -funbox-strict-fields
