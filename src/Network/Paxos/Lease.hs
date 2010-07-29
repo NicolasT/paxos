@@ -1,3 +1,22 @@
+-- Paxos - A Haskell library implementing several Paxos-related algorithms
+--
+-- Copyright (C) 2010  Nicolas Trangez
+--
+-- This library is free software; you can redistribute it and/or
+-- modify it under the terms of the GNU Lesser General Public
+-- License as published by the Free Software Foundation;
+-- version 2.1 of the License.
+--
+-- This library is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-- Lesser General Public License for more details.
+--
+-- You should have received a copy of the GNU Lesser General Public
+-- License along with this library; if not, write to the Free Software
+-- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+-- 02110-1301  USA
+
 {-# LANGUAGE TemplateHaskell, GeneralizedNewtypeDeriving #-}
 
 module Network.Paxos.Lease where
@@ -15,7 +34,7 @@ import qualified Control.Monad.State as S
 import Control.Monad.Trans (MonadIO, liftIO)
 
 import Control.Concurrent (forkIO, threadDelay)
-import Control.Concurrent.MVar (MVar, newMVar, putMVar, readMVar, swapMVar)
+import Control.Concurrent.MVar (MVar, newMVar, readMVar, swapMVar)
 
 import System.Log.Logger.TH (deriveLoggers)
 import qualified System.Log.Logger as HSL
@@ -146,7 +165,7 @@ nextBallotNumber s = assert (n > h) n
 propose :: PaxosLease Action
 propose = do state <- get
              let n = nextBallotNumber state
-             liftIO $ swapMVar (stBallotNumber state) n
+             _ <- liftIO $ swapMVar (stBallotNumber state) n
              S.put $ state { stNumOpen = 0
                            , stNumAccepted = 0
                            }
@@ -158,8 +177,8 @@ hasLease = do state <- get
 
 
 scheduleTimeout :: Int -> IO () -> IO ()
-scheduleTimeout t a = do forkIO $ do threadDelay t
-                                     a
+scheduleTimeout t a = do _ <- forkIO $ do threadDelay t
+                                          a
                          return ()
 
 handleMessage :: ProtocolMessage -> PaxosLease Action
@@ -172,11 +191,11 @@ handleMessage (PrepareRequest i) = do state <- get
 handleMessage (ProposeRequest i p) = do state <- get
                                         if i < stHighestPromised state
                                             then return Ignore
-                                            else do liftIO $ swapMVar (stAcceptedProposal state) p
+                                            else do _ <- liftIO $ swapMVar (stAcceptedProposal state) p
                                                     -- TODO Set timeout
                                                     let t = prTimeout p
-                                                    liftIO $ scheduleTimeout t $ do swapMVar (stAcceptedProposal state) Empty
-                                                                                    return ()
+                                                    _ <- liftIO $ scheduleTimeout t $ do _ <- swapMVar (stAcceptedProposal state) Empty
+                                                                                         return ()
                                                     return . Reply $ ProposeResponse i
 handleMessage (PrepareResponse i p) = do state <- get
                                          b <- liftIO $ readMVar $ stBallotNumber state
@@ -191,8 +210,8 @@ handleMessage (PrepareResponse i p) = do state <- get
                                                      let a = (stNumOpen state')
                                                      if a < ((stNumPeers state') `div` 2) + 1
                                                          then return Ignore
-                                                         else do liftIO $ scheduleTimeout timeout $ do swapMVar (stBallotNumber state') undefined
-                                                                                                       swapMVar (stHasLease state') False
+                                                         else do liftIO $ scheduleTimeout timeout $ do _ <- swapMVar (stBallotNumber state') undefined
+                                                                                                       _ <- swapMVar (stHasLease state') False
                                                                                                        return ()
                                                                  return . Broadcast $ ProposeRequest b $ Proposal (stId state') timeout
 
@@ -204,7 +223,7 @@ handleMessage (ProposeResponse i) = do state <- get
                                                    put $ state { stNumAccepted = a }
                                                    if a < ((stNumPeers state) `div` 2) + 1
                                                        then return Ignore
-                                                       else do liftIO $ swapMVar (stHasLease state) True
+                                                       else do _ <- liftIO $ swapMVar (stHasLease state) True
                                                                infoM "*** I'm the leader"
                                                                return Ignore
 

@@ -18,19 +18,19 @@ Library
       binary,
       hslogger,
       hslogger-template,
-      mtl,
-      network
+      mtl
 
     Hs-Source-Dirs: src
-    GHC-Options: -Wall -O2 -funbox-strict-fields
+    GHC-Options: -Wall -Werror -O2 -funbox-strict-fields
 
 Executable lease
     Main-is: Lease.hs
     Build-Depends:
       base,
-      paxos,
+      mtl,
+      binary,
       hslogger,
       hslogger-template
 
-    Hs-Source-Dirs: demo
-    GHC-Options: -Wall -O2 -funbox-strict-fields
+    Hs-Source-Dirs: demo, src
+    GHC-Options: -Wall -Werror -O2 -funbox-strict-fields
