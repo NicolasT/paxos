@@ -47,81 +47,95 @@ type BallotNumber = Int
 type Id = Int
 
 data Proposal = Empty
-              | Proposal { prProposerId :: Id
-                         , prTimeout :: Int
-                         }
-    deriving (Show, Eq)
+              | Proposal
+                  { prProposerId :: Id
+                  , prTimeout :: Int
+                  }
+  deriving (Show, Eq)
 
 instance Binary Proposal where
     put Empty = B.put (0 :: Word8)
-    put (Proposal i t) = do B.put (1 :: Word8)
-                            B.put i
-                            B.put t
+    put (Proposal i t) = do
+        B.put (1 :: Word8)
+        B.put i
+        B.put t
 
-    get = do tag <- getWord8
-             case tag of
-                 0 -> return Empty
-                 1 -> liftM2 Proposal B.get B.get
-                 _ -> error "Invalid proposal tag"
+    get = do
+        tag <- getWord8
+        case tag of
+            0 -> return Empty
+            1 -> liftM2 Proposal B.get B.get
+            _ -> error "Invalid proposal tag"
 
 
 data ProtocolMessage = PrepareRequest BallotNumber
                      | ProposeRequest BallotNumber Proposal
                      | PrepareResponse BallotNumber Proposal
                      | ProposeResponse BallotNumber
-    deriving (Show, Eq)
+  deriving (Show, Eq)
 
 instance Binary ProtocolMessage where
-    put (PrepareRequest i) = do B.put (0 :: Word8)
-                                B.put i
-    put (ProposeRequest i p) = do B.put (1 :: Word8)
-                                  B.put i
-                                  B.put p
-    put (PrepareResponse i p) = do B.put (2 :: Word8)
-                                   B.put i
-                                   B.put p
-    put (ProposeResponse i) = do B.put (3 :: Word8)
-                                 B.put i
+    put (PrepareRequest i) = do
+        B.put (0 :: Word8)
+        B.put i
+    put (ProposeRequest i p) = do
+        B.put (1 :: Word8)
+        B.put i
+        B.put p
+    put (PrepareResponse i p) = do
+        B.put (2 :: Word8)
+        B.put i
+        B.put p
+    put (ProposeResponse i) = do
+        B.put (3 :: Word8)
+        B.put i
 
-    get = do tag <- getWord8
-             case tag of
-                 0 -> liftM PrepareRequest B.get
-                 1 -> liftM2 ProposeRequest B.get B.get
-                 2 -> liftM2 PrepareResponse B.get B.get
-                 3 -> liftM ProposeResponse B.get
-                 _ -> error "Invalid message tag"
+    get = do
+        tag <- getWord8
+        case tag of
+            0 -> liftM PrepareRequest B.get
+            1 -> liftM2 ProposeRequest B.get B.get
+            2 -> liftM2 PrepareResponse B.get B.get
+            3 -> liftM ProposeResponse B.get
+            _ -> error "Invalid message tag"
 
 
 newtype PaxosLease a = PL {
     runPL :: S.StateT State IO a
-} deriving (Monad, MonadIO, S.MonadState State)
+}
+  deriving (Monad, MonadIO, S.MonadState State)
 
 runPaxosLease :: PaxosLease a -> State -> IO (a, State)
 runPaxosLease = S.runStateT . runPL
 
-data State = State { stId :: Int
+data State = State
+    { stId :: Int
 
-                   -- Acceptor data
-                   , stHighestPromised :: BallotNumber
-                   , stAcceptedProposal :: MVar Proposal
+    -- Acceptor data
+    , stHighestPromised :: BallotNumber
+    , stAcceptedProposal :: MVar Proposal
 
-                   -- Proposer data
-                   , stBallotNumber :: MVar BallotNumber
-                   , stHasLease :: MVar Bool
-                   , stNumPeers :: Int
-                   , stNumOpen :: Int
-                   , stNumAccepted :: Int
-                   }
+    -- Proposer data
+    , stBallotNumber :: MVar BallotNumber
+    , stHasLease :: MVar Bool
+    , stNumPeers :: Int
+    , stNumOpen :: Int
+    , stNumAccepted :: Int
+    }
 
 instance Show State where
-    show s = "State { stId = " ++ a1 ++ ", stHighestPromised = " ++ a2 ++
-                ", stNumPeers = " ++ a3 ++ ", stNumOpen = " ++ a4 ++
-                ", stNumAccepted = " ++ a5 ++ " }"
-        where a1 = show $ stId s
-              a2 = show $ stHighestPromised s
-              a3 = show $ stNumPeers s
-              a4 = show $ stNumOpen s
-              a5 = show $ stNumAccepted s
+    show s = "State " ++
+             "{ stId = " ++ a1 ++
+             ", stHighestPromised = " ++ a2 ++
+             ", stNumPeers = " ++ a3 ++
+             ", stNumOpen = " ++ a4 ++
+             ", stNumAccepted = " ++ a5 ++
+             " }"
+      where a1 = show $ stId s
+            a2 = show $ stHighestPromised s
+            a3 = show $ stNumPeers s
+            a4 = show $ stNumOpen s
+            a5 = show $ stNumAccepted s
 
 createState :: Int -> Int -> IO State
 createState i n = do
@@ -142,90 +156,115 @@ createState i n = do
 data Action = Broadcast ProtocolMessage
             | Reply ProtocolMessage
             | Ignore
-    deriving (Show, Eq)
+  deriving (Show, Eq)
 
 get :: PaxosLease State
-get = do state <- S.get
-         debugM $ "Retrieved state: " ++ show state
-         return state
+get = do
+    state <- S.get
+    debugM $ "Retrieved state: " ++ show state
+    return state
+{-# INLINE get #-}
 
 put :: State -> PaxosLease ()
-put s = do debugM $ "Commit state: " ++ show s
-           S.put s
+put s = do
+    debugM $ "Commit state: " ++ show s
+    S.put s
+{-# INLINE put #-}
 
 nextBallotNumber :: State -> BallotNumber
 nextBallotNumber s = assert (n > h) n
-    where h = stHighestPromised s
-          i = stId s
-          p = stNumPeers s
-          l = p + 1
-          d = h `div` l
-          n = (d + 1) * l + i
+  where h = stHighestPromised s
+        i = stId s
+        p = stNumPeers s
+        l = p + 1
+        d = h `div` l
+        n = (d + 1) * l + i
+
+f :: (Monad m) => m a -> m ()
+f a = do
+    _ <- a
+    return ()
+{-# INLINE f #-}
 
 propose :: PaxosLease Action
-propose = do state <- get
-             let n = nextBallotNumber state
-             _ <- liftIO $ swapMVar (stBallotNumber state) n
-             S.put $ state { stNumOpen = 0
-                           , stNumAccepted = 0
-                           }
-             return $ Broadcast $ PrepareRequest n
+propose = do
+    state <- get
+    let n = nextBallotNumber state
+    f $ liftIO $ swapMVar (stBallotNumber state) n
+    S.put $ state { stNumOpen = 0
+                  , stNumAccepted = 0
+                  }
+    return $ Broadcast $ PrepareRequest n
 
 hasLease :: PaxosLease Bool
-hasLease = do state <- get
-              liftIO $ readMVar $ stHasLease state
+hasLease = do
+    state <- get
+    liftIO $ readMVar $ stHasLease state
 
 
 scheduleTimeout :: Int -> IO () -> IO ()
-scheduleTimeout t a = do _ <- forkIO $ do threadDelay t
-                                          a
-                         return ()
+scheduleTimeout t a = f $ forkIO $ do
+    threadDelay t
+    a
 
 handleMessage :: ProtocolMessage -> PaxosLease Action
-handleMessage (PrepareRequest i) = do state <- get
-                                      if i < stHighestPromised state
-                                          then return Ignore
-                                          else do put $ state { stHighestPromised = i }
-                                                  a <- liftIO $ readMVar $ stAcceptedProposal state
-                                                  return . Reply $ PrepareResponse i a
-handleMessage (ProposeRequest i p) = do state <- get
-                                        if i < stHighestPromised state
-                                            then return Ignore
-                                            else do _ <- liftIO $ swapMVar (stAcceptedProposal state) p
-                                                    -- TODO Set timeout
-                                                    let t = prTimeout p
-                                                    _ <- liftIO $ scheduleTimeout t $ do _ <- swapMVar (stAcceptedProposal state) Empty
-                                                                                         return ()
-                                                    return . Reply $ ProposeResponse i
-handleMessage (PrepareResponse i p) = do state <- get
-                                         b <- liftIO $ readMVar $ stBallotNumber state
-                                         if i /= b
-                                             then return Ignore
-                                             else do case p of
-                                                         Empty -> do let n = (stNumOpen state) + 1
-                                                                     put $ state { stNumOpen = n }
-                                                         _ -> return ()
+handleMessage (PrepareRequest i) = do
+    state <- get
+    if i < stHighestPromised state
+        then return Ignore
+        else do
+            put $ state { stHighestPromised = i }
+            a <- liftIO $ readMVar $ stAcceptedProposal state
+            return . Reply $ PrepareResponse i a
 
-                                                     state' <- get
-                                                     let a = (stNumOpen state')
-                                                     if a < ((stNumPeers state') `div` 2) + 1
-                                                         then return Ignore
-                                                         else do liftIO $ scheduleTimeout timeout $ do _ <- swapMVar (stBallotNumber state') undefined
-                                                                                                       _ <- swapMVar (stHasLease state') False
-                                                                                                       return ()
-                                                                 return . Broadcast $ ProposeRequest b $ Proposal (stId state') timeout
+handleMessage (ProposeRequest i p) = do
+    state <- get
+    if i < stHighestPromised state
+        then return Ignore
+        else do
+            f $ liftIO $ swapMVar (stAcceptedProposal state) p
+            let t = prTimeout p
+            f $ liftIO $ scheduleTimeout t $
+                f $ swapMVar (stAcceptedProposal state) Empty
+            return . Reply $ ProposeResponse i
 
-handleMessage (ProposeResponse i) = do state <- get
-                                       b <- liftIO $ readMVar $ stBallotNumber state
-                                       if i /= b 
-                                           then return Ignore
-                                           else do let a = (stNumAccepted state) + 1
-                                                   put $ state { stNumAccepted = a }
-                                                   if a < ((stNumPeers state) `div` 2) + 1
-                                                       then return Ignore
-                                                       else do _ <- liftIO $ swapMVar (stHasLease state) True
-                                                               infoM "*** I'm the leader"
-                                                               return Ignore
+handleMessage (PrepareResponse i p) = do
+    state <- get
+    b <- liftIO $ readMVar $ stBallotNumber state
+    if i /= b
+        then return Ignore
+        else do
+            case p of
+                Empty -> do
+                    let n = stNumOpen state + 1
+                    put $ state { stNumOpen = n }
+                _ -> return ()
+
+            state' <- get
+            let a = stNumOpen state'
+            if a < (stNumPeers state' `div` 2) + 1
+                then return Ignore
+                else do
+                    liftIO $ scheduleTimeout timeout $ do
+                        f $ swapMVar (stBallotNumber state') undefined
+                        f $ swapMVar (stHasLease state') False
+                    return . Broadcast $ ProposeRequest b $
+                        Proposal (stId state') timeout
+
+handleMessage (ProposeResponse i) = do
+    state <- get
+    b <- liftIO $ readMVar $ stBallotNumber state
+    if i /= b
+        then return Ignore
+        else do
+            let a = stNumAccepted state + 1
+            put $ state { stNumAccepted = a }
+            if a < (stNumPeers state `div` 2) + 1
+                then return Ignore
+                else do
+                    f $ liftIO $ swapMVar (stHasLease state) True
+                    infoM "*** I'm the leader"
+                    return Ignore
 
 timeout :: Int
 timeout = 10000
