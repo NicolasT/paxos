@@ -19,7 +19,23 @@
 
 {-# LANGUAGE TemplateHaskell, GeneralizedNewtypeDeriving #-}
 
-module Network.Paxos.Lease where
+module Network.Paxos.Lease
+    (
+      -- * The $PaxosLease$ monad
+      PaxosLease
+    , runPaxosLease
+    , State
+    , createState
+
+      -- * Actions
+    , Action(..)
+    , propose
+    , hasLease
+    , handleMessage
+
+      -- * Misc
+    , version
+    ) where
 
 import Prelude hiding (catch)
 
@@ -47,24 +63,20 @@ type BallotNumber = Int
 type Id = Int
 
 data Proposal = Empty
-              | Proposal
-                  { prProposerId :: Id
-                  , prTimeout :: Int
-                  }
+              | Proposal Int
   deriving (Show, Eq)
 
 instance Binary Proposal where
     put Empty = B.put (0 :: Word8)
-    put (Proposal i t) = do
+    put (Proposal t) = do
         B.put (1 :: Word8)
-        B.put i
         B.put t
 
     get = do
         tag <- getWord8
         case tag of
             0 -> return Empty
-            1 -> liftM2 Proposal B.get B.get
+            1 -> liftM Proposal B.get
             _ -> error "Invalid proposal tag"
 
 
@@ -109,7 +121,7 @@ runPaxosLease :: PaxosLease a -> State -> IO (a, State)
 runPaxosLease = S.runStateT . runPL
 
 data State = State
-    { stId :: Int
+    { stId :: Id
 
     -- Acceptor data
     , stHighestPromised :: BallotNumber
@@ -217,16 +229,18 @@ handleMessage (PrepareRequest i) = do
             a <- liftIO $ readMVar $ stAcceptedProposal state
             return . Reply $ PrepareResponse i a
 
-handleMessage (ProposeRequest i p) = do
+handleMessage (ProposeRequest i p@(Proposal t)) = do
     state <- get
     if i < stHighestPromised state
         then return Ignore
         else do
             f $ liftIO $ swapMVar (stAcceptedProposal state) p
-            let t = prTimeout p
             f $ liftIO $ scheduleTimeout t $
                 f $ swapMVar (stAcceptedProposal state) Empty
             return . Reply $ ProposeResponse i
+
+handleMessage (ProposeRequest _ Empty) =
+    error "Received Propose request with Empty proposal"
 
 handleMessage (PrepareResponse i p) = do
     state <- get
@@ -249,7 +263,7 @@ handleMessage (PrepareResponse i p) = do
                         f $ swapMVar (stBallotNumber state') undefined
                         f $ swapMVar (stHasLease state') False
                     return . Broadcast $ ProposeRequest b $
-                        Proposal (stId state') timeout
+                        Proposal timeout
 
 handleMessage (ProposeResponse i) = do
     state <- get
