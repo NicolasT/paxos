@@ -21,7 +21,7 @@ Library
       mtl
 
     Hs-Source-Dirs: src
-    GHC-Options: -Wall -Werror -O2 -funbox-strict-fields
+    GHC-Options: -Wall -O2 -funbox-strict-fields
 
 Executable lease
     Main-is: Lease.hs
@@ -33,4 +33,16 @@ Executable lease
       hslogger-template
 
     Hs-Source-Dirs: demo, src
-    GHC-Options: -Wall -Werror -O2 -funbox-strict-fields
+    GHC-Options: -Wall -O2 -funbox-strict-fields
+
+Executable test-paxos
+    Main-is: Test.hs
+    Build-Depends:
+      base,
+      binary,
+      test-framework,
+      test-framework-quickcheck2,
+      QuickCheck
+
+    Hs-Source-Dirs: ., src
+    GHC-Options: -Wall -O2 -funbox-strict-fields
