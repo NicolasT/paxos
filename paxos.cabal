@@ -31,7 +31,7 @@ Library
 Executable synod
   Main-Is:             synod.hs
   Build-Depends:       base >= 4 && < 5,
-                       stm,
+                       stm >= 2.4,
                        random,
                        paxos
   Hs-Source-Dirs:      bin
