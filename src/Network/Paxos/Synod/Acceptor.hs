@@ -76,13 +76,24 @@ handlePrepare :: Ord nodeId
               -> (AcceptorState nodeId value, [Action nodeId value])
 handlePrepare state proposer (Prepare proposal) =
     case highestPromise state of
+        -- If we didn't send any promise yet, the given proposal is OK, and we promise to store it
+        -- and never accept any lower proposals
         Nothing -> (state', sendPromise)
+        -- Otherwise, only accept the proposal if it's higher than the highest one for which we
+        -- returned a promise before
         Just promised -> case compare promised proposal of
+                            -- The highest proposal to which we send a `Promise' reply is lower
+                            -- than this one, accept it
                             LT -> (state', sendPromise)
-                            EQ -> (state, []) -- Duplicate
+                            -- They're equal, most likely some message duplication occurred
+                            EQ -> (state, [])
+                            -- We already promised not to accept any proposals lower than `promised',
+                            -- and the current proposal is lower, so we ignore this proposal
                             GT -> (state, []) -- TODO Nack
   where
+    -- We accept this proposal: store it
     state' = state { highestPromise = Just proposal }
+    -- We accept this proposal: return a `Promise' to the Proposer
     sendPromise = [Send proposer $ MsgPromise $ Promise proposal (highestAccepted state')]
 
 prop_handlePrepare :: AcceptorState Int () -> Int -> Prepare Int -> Bool
@@ -107,20 +118,38 @@ handleAccept :: Ord nodeId
              -> (AcceptorState nodeId value, [Action nodeId value])
 handleAccept state (Accept proposal value) =
     case highestPromise state of
+        -- We didn't promise anything yet, so we can accept this (and update our `highestPromise'
+        -- value accordingly!)
         Nothing -> (state', [sendAccepted])
+        -- We already sent a `Promise', check whether we can accept what's offered...
         Just promised -> case compare promised proposal of
+                             -- We promised not to accept any proposals below `promised', but
+                             -- this proposal exceeds this, so we can accept it (and update our
+                             -- `highestPromise' value accordingly)
                              LT -> (state', [sendAccepted])
+                             -- The given proposal is equal to the one we promised to use as
+                             -- lower-bound. This is just fine, but we only want to broadcast an
+                             -- `Accepted' message once
                              EQ -> case highestAccepted state of
+                                     -- We didn't accept anything before, so update the state
+                                     -- and broadcast an `Accepted' message
                                      Nothing -> (state', [sendAccepted])
+                                     -- We accepted something before...
                                      Just (AcceptedValue p _) ->
                                          if p == proposal
-                                             then (state, []) -- Duplicate
+                                             -- If we accepted the current proposal before,
+                                             -- ignore this message, it's a duplicate
+                                             then (state, [])
+                                             -- Otherwise, we accepted an older proposal before.
+                                             -- Update the state and broadcast `Accepted'
                                              else (state', [sendAccepted])
                              GT -> (state, []) -- TODO Nack
   where
+    -- Assuming the conditions to accept this message are met, update the state...
     state' = state { highestPromise = Just proposal
                    , highestAccepted = Just $ AcceptedValue proposal value
                    }
+    -- ... and broadcast an `Accepted' message to all Learners
     sendAccepted = Broadcast Learners $ MsgAccepted $ Accepted proposal value
 
 prop_handleAccept :: AcceptorState Int () -> Accept Int () -> Bool

@@ -97,21 +97,44 @@ handlePromise :: Ord nodeId => ProposerState nodeId value  -- ^ Current state
                             -> Promise nodeId value  -- ^ Received message
                             -> (ProposerState nodeId value, [Action nodeId value])
 handlePromise state acceptor (Promise proposalId' highestAccepted')
+    -- Promises for older proposals than the one we're handling are ignored
+    -- (most likely some message reordering occurred)
     | proposalId' < proposalId state = (state, [])
+    -- Promises of proposals newer than the one we're handling are ignored,
+    -- although we might want to send a hint to the manager he might want
+    -- to restart a round with a higher proposal number
     | proposalId' > proposalId state = (state, []) -- TODO Give up and start new round?
+    -- The given proposal number matches the one this proposer is handling
     | otherwise =
+        -- Check whether we already handled a promise of this acceptor
         if acceptor `elem` acceptors state
+            -- If so, ignore the message (some message duplication occurred)
             then (state, [])
+            -- All well, update state and return some actions (if any)
             else (state', msgs)
   where
+    -- Updated state assuming
+    -- * The message is a promise matching the proposal number we're
+    --   handling
+    -- * A promise of this acceptor wasn't handled yet
     state' = state { acceptors = acceptor : acceptors state
                    , highestAccepted = selectedAccepted
                    }
+    -- Select the `AcceptedValue' to remember: this is the maximum of the
+    -- one we received before (if any) and the one contained in this
+    -- message (again, if any)
     selectedAccepted = case highestAccepted state of
                            Nothing -> highestAccepted'
                            Just v -> case highestAccepted' of
                                Nothing -> Just v
                                Just v' -> Just $ max v v'
+    -- Actions to execute as a result of this state change
+    -- If we reached (but didn't exceed) the quorum (i.e. a quorum of
+    -- acceptors sent a promise for the current proposal), send an `Accept'
+    -- message to all Acceptors. The value contained in this command should
+    -- be the one of the highest `AcceptedValue' we received in any
+    -- `Promise', if any. Otherwise, we can use any value we want (or, more
+    -- likely, the one our user wants to distribute).
     msgs = if length (acceptors state') /= fromIntegral (unQuorum $ quorum state')
                then []
                else [Broadcast Acceptors $ MsgAccept $ Accept (proposalId state') value']
