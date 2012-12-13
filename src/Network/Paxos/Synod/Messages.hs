@@ -31,7 +31,10 @@ module Network.Paxos.Synod.Messages (
 
 import Control.Applicative
 
+import Data.Word (Word32)
 import Data.Serialize
+import Data.Serialize.QuickCheck
+
 import Data.Typeable (Typeable)
 
 import Test.Framework (Test, testGroup)
@@ -94,26 +97,32 @@ data Message nodeId value = MsgPrepare (Prepare nodeId)
                           -- ^ An `Accept' message, from Proposer to Acceptor
                           | MsgAccepted (Accepted nodeId value)
                           -- ^ An `Accepted' message, from Acceptor to Learner
-                          | MsgUnknown
-                          -- ^ Some unknown message was received, and (e.g.) parsing failed
   deriving (Show, Eq, Typeable)
+
+serial :: Word32
+serial = 0x20121214
 
 instance (Serialize nodeId, Serialize value) => Serialize (Message nodeId value) where
     get = do
-        tag <- getWord8
-        case tag of
-            1 -> MsgPrepare <$> get
-            2 -> MsgPromise <$> get
-            3 -> MsgAccept <$> get
-            4 -> MsgAccepted <$> get
-            _ -> return MsgUnknown
+        serial' <- getWord32le
+        if serial' /= serial
+            then fail "Message: invalid serial"
+            else do
+                tag <- getWord8
+                case tag of
+                    1 -> MsgPrepare <$> get
+                    2 -> MsgPromise <$> get
+                    3 -> MsgAccept <$> get
+                    4 -> MsgAccepted <$> get
+                    _ -> fail "Message: invalid tag"
 
-    put msg = case msg of
-        MsgPrepare m -> putWord8 1 >> put m
-        MsgPromise m -> putWord8 2 >> put m
-        MsgAccept m -> putWord8 3 >> put m
-        MsgAccepted m -> putWord8 4 >> put m
-        MsgUnknown -> error "put: can't serialize MsgUnknown"
+    put msg = do
+        putWord32le serial
+        case msg of
+            MsgPrepare m -> putWord8 1 >> put m
+            MsgPromise m -> putWord8 2 >> put m
+            MsgAccept m -> putWord8 3 >> put m
+            MsgAccepted m -> putWord8 4 >> put m
 
 instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (Message nodeId value) where
     arbitrary = oneof [ MsgPrepare <$> arbitrary
@@ -122,11 +131,8 @@ instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (Message nodeId value)
                       , MsgAccepted <$> arbitrary
                       ]
 
-prop_serialization :: Message String Int -> Bool
-prop_serialization msg = decode (encode msg) == Right msg
-
 
 tests :: Test
 tests = testGroup "Network.Paxos.Synod.Messages" [
-              testProperty "serialization" prop_serialization
+              testProperty "Message Serialize" $ prop_serialize (undefined :: Message String Int)
             ]
