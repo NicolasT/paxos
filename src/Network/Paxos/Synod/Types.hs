@@ -41,6 +41,7 @@ import Control.Applicative ((<$>), (<*>))
 import Data.Word (Word, Word64)
 
 import Data.Serialize
+import Data.Serialize.QuickCheck
 import Data.Typeable
 
 import Test.Framework (Test, testGroup)
@@ -115,6 +116,10 @@ prop_bumpProposalId2 p1 p2 = p2' > p1'
 newtype Quorum = Quorum { unQuorum :: Word }
   deriving (Show, Eq, Ord, Typeable)
 
+instance Serialize Quorum where
+    get = Quorum <$> get
+    put = put . unQuorum
+
 instance Arbitrary Quorum where
     arbitrary = Quorum <$> arbitrary
 
@@ -163,6 +168,7 @@ tests :: Test
 tests = testGroup "Network.Paxos.Synod.Types" [
             -- ProposalId
               testProperty "ProposalId Ord" prop_ProposalId_Ord
+            , testProperty "ProposalId Serialize" $ prop_serialize (undefined :: ProposalId String)
             -- succProposalId
             , testProperty "succProposalId1" prop_succProposalId1
             , testProperty "succProposalId2" prop_succProposalId2
@@ -172,4 +178,5 @@ tests = testGroup "Network.Paxos.Synod.Types" [
             -- AcceptedValue
             , testProperty "AcceptedValue Eq" prop_AcceptedValue_Eq
             , testProperty "AcceptedValue Ord" prop_AcceptedValue_Ord
+            , testProperty "AcceptedValue Serialize" $ prop_serialize (undefined :: AcceptedValue String Int)
             ]

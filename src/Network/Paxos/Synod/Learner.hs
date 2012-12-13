@@ -37,6 +37,10 @@ import Data.Maybe (fromJust, isNothing)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
+import Data.Word (Word32)
+import Data.Serialize
+import Data.Serialize.QuickCheck
+
 import Test.Framework (Test, testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 
@@ -52,6 +56,27 @@ data LearnerState nodeId value = Learning { quorum :: Quorum
                                           }
                                | Decided value
   deriving (Show, Eq)
+
+serial :: Word32
+serial = 0x20121214
+
+instance (Ord nodeId, Serialize nodeId, Serialize value) => Serialize (LearnerState nodeId value) where
+    get = do
+        serial' <- getWord32le
+        if serial' /= serial
+            then fail "LearnerState: invalid serial"
+            else do
+                tag <- getWord8
+                case tag of
+                    1 -> Learning <$> get <*> get <*> get
+                    2 -> Decided <$> get
+                    _ -> fail "LearnerState: invalid tag"
+
+    put state = do
+        putWord32le serial
+        case state of
+            Learning a b c -> putWord8 1 >> put a >> put b >> put c
+            Decided a -> putWord8 2 >> put a
 
 instance (Ord nodeId, Arbitrary nodeId, Arbitrary value) => Arbitrary (LearnerState nodeId value) where
     arbitrary = oneof [learning, decided]
@@ -165,5 +190,6 @@ tests = testGroup "Network.Paxos.Synod.Learner" [
               testProperty "initialize" prop_initialize
             , testProperty "handleAccepted1" prop_handleAccepted1
             , testProperty "handleAccepted2" prop_handleAccepted2
-            , testProperty "prop_getValue" prop_getValue
+            , testProperty "getValue" prop_getValue
+            , testProperty "LearnerState Serialize" $ prop_serialize (undefined :: LearnerState String Int)
             ]

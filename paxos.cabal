@@ -23,7 +23,8 @@ Library
                        Network.Paxos.Synod.Proposer,
                        Network.Paxos.Synod.Acceptor,
                        Network.Paxos.Synod.Learner
-  Other-Modules:       Network.Paxos.Synod.Action,
+  Other-Modules:       Data.Serialize.QuickCheck,
+                       Network.Paxos.Synod.Action,
                        Network.Paxos.Synod.Types,
                        Network.Paxos.Synod.Messages
   Build-Depends:       base >= 4 && < 5,

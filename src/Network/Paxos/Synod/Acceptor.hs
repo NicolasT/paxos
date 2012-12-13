@@ -30,7 +30,13 @@ module Network.Paxos.Synod.Acceptor (
     , tests
     ) where
 
+import Control.Applicative
+
 import Data.Maybe (isNothing)
+
+import Data.Word (Word32)
+import Data.Serialize
+import Data.Serialize.QuickCheck
 
 import Test.Framework (Test, testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -46,6 +52,18 @@ data AcceptorState nodeId value = AcceptorState { highestPromise :: Maybe (Propo
                                                 , highestAccepted :: Maybe (AcceptedValue nodeId value)
                                                 }
   deriving (Show, Eq)
+
+serial :: Word32
+serial = 0x20121214
+
+instance (Serialize nodeId, Serialize value) => Serialize (AcceptorState nodeId value) where
+    get = do
+        serial' <- getWord32le
+        if serial' /= serial
+            then fail "AcceptorState: invalid serial"
+            else AcceptorState <$> get <*> get
+
+    put (AcceptorState a b) = putWord32le serial >> put a >> put b
 
 instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (AcceptorState nodeId value) where
     arbitrary = do
@@ -179,4 +197,5 @@ tests = testGroup "Network.Paxos.Synod.Acceptor" [
               testProperty "initialize" prop_initialize
             , testProperty "handlePrepare" prop_handlePrepare
             , testProperty "handleAccept" prop_handleAccept
+            , testProperty "AcceptorState Serialize" $ prop_serialize (undefined :: AcceptorState String Int)
             ]

@@ -38,6 +38,10 @@ import Control.Applicative
 
 import Data.Maybe (isNothing)
 
+import Data.Word (Word32)
+import Data.Serialize
+import Data.Serialize.QuickCheck
+
 import Test.Framework (Test, testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 
@@ -55,6 +59,17 @@ data ProposerState nodeId value = ProposerState { proposalId :: ProposalId nodeI
                                                 , highestAccepted :: Maybe (AcceptedValue nodeId value)
                                                 }
   deriving (Show, Eq)
+
+serial :: Word32
+serial = 0x20121213
+
+instance (Serialize nodeId, Serialize value) => Serialize (ProposerState nodeId value) where
+    get = do
+        serial' <- getWord32le
+        if serial' /= serial
+            then fail "ProposerState: invalid serial"
+            else ProposerState <$> get <*> get <*> get <*> get <*> get
+    put (ProposerState a b c d e) = putWord32le serial >> put a >> put b >> put c >> put d >> put e
 
 instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (ProposerState nodeId value) where
     arbitrary = ProposerState <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
@@ -171,4 +186,5 @@ tests = testGroup "Network.Paxos.Synod.Proposer" [
               testProperty "startRound1" prop_startRound1
             , testProperty "startRound2" prop_startRound2
             , testProperty "handlePromise" prop_handlePromise
+            , testProperty "ProposerState Seralize" $ prop_serialize (undefined :: ProposerState String Int)
             ]
