@@ -18,6 +18,8 @@
  - USA.
  -}
 
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Network.Paxos.Synod.Types (
     -- * Proposal identifier handling
       ProposalId
@@ -39,6 +41,7 @@ import Control.Applicative ((<$>), (<*>))
 import Data.Word (Word, Word64)
 
 import Data.Serialize
+import Data.Typeable
 
 import Test.Framework (Test, testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -47,7 +50,7 @@ import Test.QuickCheck (Arbitrary, arbitrary)
 
 -- | Representation of a proposal identifier
 data ProposalId nodeId = ProposalId {-# UNPACK #-} !Word64 nodeId
-  deriving (Show, Eq)
+  deriving (Show, Eq, Typeable)
 
 -- Note: even though the following instance should be exactly the one
 -- derived using `deriving(Ord)', I prefer to provide an explicit
@@ -110,7 +113,7 @@ prop_bumpProposalId2 p1 p2 = p2' > p1'
 
 -- | Quorum number
 newtype Quorum = Quorum { unQuorum :: Word }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Typeable)
 
 instance Arbitrary Quorum where
     arbitrary = Quorum <$> arbitrary
@@ -127,7 +130,7 @@ quorum q
 data AcceptedValue nodeId value = AcceptedValue { acceptedProposalId :: ProposalId nodeId
                                                 , acceptedValue :: value
                                                 }
-  deriving (Show)
+  deriving (Show, Typeable)
 
 -- Explicit Eq and Ord instances so there's no (unnecessary) Eq or Ord
 -- constraint on `value', since these should always be equal if the

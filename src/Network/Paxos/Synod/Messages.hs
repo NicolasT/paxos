@@ -18,6 +18,8 @@
  - USA.
  -}
 
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Network.Paxos.Synod.Messages (
       Prepare(Prepare)
     , Promise(Promise)
@@ -30,6 +32,7 @@ module Network.Paxos.Synod.Messages (
 import Control.Applicative
 
 import Data.Serialize
+import Data.Typeable (Typeable)
 
 import Test.Framework (Test, testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -39,7 +42,7 @@ import Test.QuickCheck (Arbitrary, arbitrary, oneof)
 import Network.Paxos.Synod.Types hiding (tests)
 
 data Prepare nodeId = Prepare (ProposalId nodeId)
-  deriving (Show, Eq)
+  deriving (Show, Eq, Typeable)
 
 instance Serialize nodeId => Serialize (Prepare nodeId) where
     get = Prepare <$> get
@@ -50,7 +53,7 @@ instance Arbitrary nodeId => Arbitrary (Prepare nodeId) where
 
 
 data Promise nodeId value = Promise (ProposalId nodeId) (Maybe (AcceptedValue nodeId value))
-  deriving (Show, Eq)
+  deriving (Show, Eq, Typeable)
 
 instance (Serialize nodeId, Serialize value) => Serialize (Promise nodeId value) where
     get = Promise <$> get <*> get
@@ -61,7 +64,7 @@ instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (Promise nodeId value)
 
 
 data Accept nodeId value = Accept (ProposalId nodeId) value
-  deriving (Show, Eq)
+  deriving (Show, Eq, Typeable)
 
 instance (Serialize nodeId, Serialize value) => Serialize (Accept nodeId value) where
     get = Accept <$> get <*> get
@@ -72,7 +75,7 @@ instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (Accept nodeId value) 
 
 
 data Accepted nodeId value = Accepted (ProposalId nodeId) value
-  deriving (Show, Eq)
+  deriving (Show, Eq, Typeable)
 
 instance (Serialize nodeId, Serialize value) => Serialize (Accepted nodeId value) where
     get = Accepted <$> get <*> get
@@ -93,7 +96,7 @@ data Message nodeId value = MsgPrepare (Prepare nodeId)
                           -- ^ An `Accepted' message, from Acceptor to Learner
                           | MsgUnknown
                           -- ^ Some unknown message was received, and (e.g.) parsing failed
-  deriving (Show, Eq)
+  deriving (Show, Eq, Typeable)
 
 instance (Serialize nodeId, Serialize value) => Serialize (Message nodeId value) where
     get = do
