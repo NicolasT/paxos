@@ -114,7 +114,12 @@ handlePromise state acceptor (Promise proposalId' highestAccepted')
                                Just v' -> Just $ max v v'
     msgs = if length (acceptors state') /= fromIntegral (unQuorum $ quorum state')
                then []
-               else [Broadcast Acceptors $ MsgAccept $ Accept (proposalId state') (value state')]
+               else [Broadcast Acceptors $ MsgAccept $ Accept (proposalId state') value']
+    -- Retrieve the value to be distributed in an `Accept' message. This is
+    -- the value of the highest `AcceptedValue' we received as part of
+    -- `Promise' message, or the value passed by our user initially if
+    -- none.
+    value' = maybe (value state') (\(AcceptedValue _ v) -> v) (highestAccepted state')
 
 prop_handlePromise :: ProposerState Int ()
                    -> Int
@@ -130,10 +135,11 @@ prop_handlePromise state acceptor p@(Promise proposalId' highestAccepted')
                      , highestAccepted state' == max (highestAccepted state) highestAccepted'
                      , proposalId state' == proposalId state
                      , (length (acceptors state') /= fromIntegral (unQuorum $ quorum state')) ||
-                           (actions == [Broadcast Acceptors $ MsgAccept $ Accept (proposalId state') (value state')])
+                           (actions == [Broadcast Acceptors $ MsgAccept $ Accept (proposalId state') value'])
                      ]
   where
     result@(state', actions) = handlePromise state acceptor p
+    value' = maybe (value state') (\(AcceptedValue _ v) -> v) (highestAccepted state')
 
 
 -- | Tests
