@@ -34,6 +34,7 @@ Executable synod
   Build-Depends:       base >= 4 && < 5,
                        stm >= 2.4,
                        random,
+                       hslogger,
                        paxos
   Hs-Source-Dirs:      bin
   Ghc-Options:         -Wall -fwarn-incomplete-patterns -rtsopts -threaded -O2
