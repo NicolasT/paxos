@@ -32,13 +32,14 @@ module Network.Paxos.Synod (
 import Test.Framework (Test, testGroup)
 
 import Network.Paxos.Synod.Action
-import Network.Paxos.Synod.Messages
+import Network.Paxos.Synod.Messages hiding (tests)
 import Network.Paxos.Synod.Types hiding (tests)
 
 import qualified Network.Paxos.Synod.Types
 import qualified Network.Paxos.Synod.Proposer
 import qualified Network.Paxos.Synod.Acceptor
 import qualified Network.Paxos.Synod.Learner
+import qualified Network.Paxos.Synod.Messages
 
 -- | Tests for modules in "Network.Paxos.Synod"
 tests :: Test
@@ -47,4 +48,5 @@ tests = testGroup "Network.Paxos.Synod" [
         , Network.Paxos.Synod.Proposer.tests
         , Network.Paxos.Synod.Acceptor.tests
         , Network.Paxos.Synod.Learner.tests
+        , Network.Paxos.Synod.Messages.tests
         ]

@@ -38,6 +38,8 @@ import Control.Applicative ((<$>), (<*>))
 
 import Data.Word (Word, Word64)
 
+import Data.Serialize
+
 import Test.Framework (Test, testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 
@@ -54,6 +56,10 @@ instance Ord nodeId => Ord (ProposalId nodeId) where
     compare (ProposalId i1 n1) (ProposalId i2 n2)
         | i1 /= i2 = compare i1 i2
         | otherwise = compare n1 n2
+
+instance Serialize nodeId => Serialize (ProposalId nodeId) where
+    get = ProposalId <$> get <*> get
+    put (ProposalId i nodeId) = put i >> put nodeId
 
 instance Arbitrary a => Arbitrary (ProposalId a) where
     arbitrary = ProposalId <$> arbitrary <*> arbitrary
@@ -131,6 +137,10 @@ instance Eq nodeId => Eq (AcceptedValue nodeId value) where
 
 instance Ord nodeId => Ord (AcceptedValue nodeId value) where
     compare a b = compare (acceptedProposalId a) (acceptedProposalId b)
+
+instance (Serialize nodeId, Serialize value) => Serialize (AcceptedValue nodeId value) where
+    get = AcceptedValue <$> get <*> get
+    put (AcceptedValue p v) = put p >> put v
 
 instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (AcceptedValue nodeId value) where
     arbitrary = AcceptedValue <$> arbitrary <*> arbitrary

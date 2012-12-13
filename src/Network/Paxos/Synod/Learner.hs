@@ -43,7 +43,7 @@ import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck (Arbitrary, arbitrary, oneof)
 
 import Network.Paxos.Synod.Types hiding (quorum, tests)
-import Network.Paxos.Synod.Messages
+import Network.Paxos.Synod.Messages hiding (tests)
 
 -- | State of a Learner
 data LearnerState nodeId value = Learning { quorum :: Quorum

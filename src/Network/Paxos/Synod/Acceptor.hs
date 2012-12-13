@@ -39,7 +39,7 @@ import Test.QuickCheck (Arbitrary, arbitrary)
 
 import Network.Paxos.Synod.Action
 import Network.Paxos.Synod.Types hiding (tests)
-import Network.Paxos.Synod.Messages
+import Network.Paxos.Synod.Messages hiding (tests)
 
 -- | State of an Acceptor
 data AcceptorState nodeId value = AcceptorState { highestPromise :: Maybe (ProposalId nodeId)

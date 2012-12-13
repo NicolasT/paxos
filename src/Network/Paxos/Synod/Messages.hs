@@ -24,16 +24,26 @@ module Network.Paxos.Synod.Messages (
     , Accept(Accept)
     , Accepted(Accepted)
     , Message(..)
+    , tests
     ) where
 
 import Control.Applicative
 
-import Test.QuickCheck (Arbitrary, arbitrary)
+import Data.Serialize
 
-import Network.Paxos.Synod.Types
+import Test.Framework (Test, testGroup)
+import Test.Framework.Providers.QuickCheck2 (testProperty)
+
+import Test.QuickCheck (Arbitrary, arbitrary, oneof)
+
+import Network.Paxos.Synod.Types hiding (tests)
 
 data Prepare nodeId = Prepare (ProposalId nodeId)
   deriving (Show, Eq)
+
+instance Serialize nodeId => Serialize (Prepare nodeId) where
+    get = Prepare <$> get
+    put (Prepare nodeId) = put nodeId
 
 instance Arbitrary nodeId => Arbitrary (Prepare nodeId) where
     arbitrary = Prepare <$> arbitrary
@@ -42,6 +52,10 @@ instance Arbitrary nodeId => Arbitrary (Prepare nodeId) where
 data Promise nodeId value = Promise (ProposalId nodeId) (Maybe (AcceptedValue nodeId value))
   deriving (Show, Eq)
 
+instance (Serialize nodeId, Serialize value) => Serialize (Promise nodeId value) where
+    get = Promise <$> get <*> get
+    put (Promise p m) = put p >> put m
+
 instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (Promise nodeId value) where
     arbitrary = Promise <$> arbitrary <*> arbitrary
 
@@ -49,12 +63,20 @@ instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (Promise nodeId value)
 data Accept nodeId value = Accept (ProposalId nodeId) value
   deriving (Show, Eq)
 
+instance (Serialize nodeId, Serialize value) => Serialize (Accept nodeId value) where
+    get = Accept <$> get <*> get
+    put (Accept p v) = put p >> put v
+
 instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (Accept nodeId value) where
     arbitrary = Accept <$> arbitrary <*> arbitrary
 
 
 data Accepted nodeId value = Accepted (ProposalId nodeId) value
   deriving (Show, Eq)
+
+instance (Serialize nodeId, Serialize value) => Serialize (Accepted nodeId value) where
+    get = Accepted <$> get <*> get
+    put (Accepted p v) = put p >> put v
 
 instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (Accepted nodeId value) where
     arbitrary = Accepted <$> arbitrary <*> arbitrary
@@ -69,4 +91,39 @@ data Message nodeId value = MsgPrepare (Prepare nodeId)
                           -- ^ An `Accept' message, from Proposer to Acceptor
                           | MsgAccepted (Accepted nodeId value)
                           -- ^ An `Accepted' message, from Acceptor to Learner
+                          | MsgUnknown
+                          -- ^ Some unknown message was received, and (e.g.) parsing failed
   deriving (Show, Eq)
+
+instance (Serialize nodeId, Serialize value) => Serialize (Message nodeId value) where
+    get = do
+        tag <- getWord8
+        case tag of
+            1 -> MsgPrepare <$> get
+            2 -> MsgPromise <$> get
+            3 -> MsgAccept <$> get
+            4 -> MsgAccepted <$> get
+            _ -> return MsgUnknown
+
+    put msg = case msg of
+        MsgPrepare m -> putWord8 1 >> put m
+        MsgPromise m -> putWord8 2 >> put m
+        MsgAccept m -> putWord8 3 >> put m
+        MsgAccepted m -> putWord8 4 >> put m
+        MsgUnknown -> error "put: can't serialize MsgUnknown"
+
+instance (Arbitrary nodeId, Arbitrary value) => Arbitrary (Message nodeId value) where
+    arbitrary = oneof [ MsgPrepare <$> arbitrary
+                      , MsgPromise <$> arbitrary
+                      , MsgAccept <$> arbitrary
+                      , MsgAccepted <$> arbitrary
+                      ]
+
+prop_serialization :: Message String Int -> Bool
+prop_serialization msg = decode (encode msg) == Right msg
+
+
+tests :: Test
+tests = testGroup "Network.Paxos.Synod.Messages" [
+              testProperty "serialization" prop_serialization
+            ]
