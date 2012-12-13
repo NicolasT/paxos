@@ -1,2 +1,5 @@
 language: haskell
-script: cabal test --show-details=always
+script:
+  - cabal configure --enable-tests
+  - cabal build
+  - cabal test --show-details=always
